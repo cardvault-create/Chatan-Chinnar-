@@ -219,7 +219,6 @@
             100% { transform: translateY(-150px) scale(0); opacity: 0; }
         }
 
-        /* ========== HEADER ========== */
         .animated-header-box {
             background: linear-gradient(135deg, rgba(255, 215, 0, 0.15), rgba(255, 100, 0, 0.1));
             backdrop-filter: blur(15px);
@@ -275,7 +274,6 @@
             50% { transform: scale(1.03); box-shadow: 0 0 0 8px rgba(255, 215, 0, 0); }
         }
 
-        /* ========== VIRTUAL TERMINAL ========== */
         .premium-terminal {
             background: linear-gradient(135deg, rgba(20, 15, 45, 0.9), rgba(10, 8, 25, 0.95));
             border-radius: 28px;
@@ -317,7 +315,6 @@
             letter-spacing: 1px;
         }
 
-        /* ========== CATEGORY BUTTONS ========== */
         .category-buttons {
             display: flex;
             gap: 12px;
@@ -586,7 +583,7 @@
             display: none;
         }
 
-        /* QR Modal Styles */
+        /* QR Modal */
         .qr-modal {
             position: fixed;
             top: 0;
@@ -653,6 +650,12 @@
             cursor: pointer;
             margin-top: 10px;
         }
+        .upi-id-box {
+            background: rgba(0, 0, 0, 0.4);
+            border-radius: 50px;
+            padding: 10px;
+            margin-top: 10px;
+        }
 
         @media (max-width: 550px) {
             .terminal-card { padding: 16px 16px 22px; max-width: 400px; }
@@ -675,7 +678,7 @@
 </head>
 <body>
 
-<!-- Background -->
+<!-- Background Elements -->
 <div class="adventure-bg"></div>
 <div class="mountain"></div>
 <div class="mountain mountain-2"></div>
@@ -777,7 +780,7 @@
         <div class="scroll-dots" id="scrollDots"></div>
     </div>
 
-    <div class="upi-note">⚡ Click Buy → Scan QR Code & Pay ⚡</div>
+    <div class="upi-note">⚡ Click Buy → Auto Open Your UPI App OR QR Code ⚡</div>
 </div>
 
 <div id="toastMsg" class="toast-msg"></div>
@@ -808,7 +811,6 @@
     let currentCategory = "master";
     let currentCards = masterCards;
 
-    // ✅ NEW UPI ID
     const UPI_ID = "chatancheats@axl";
     const MERCHANT_NAME = "CARDVAULT";
     const CURRENCY = "INR";
@@ -827,14 +829,13 @@
         return emailInputs[cardId] || '';
     }
 
-    // ========== QR CODE GENERATION ==========
+    // ========== GENERATE QR CODE ==========
     function generateQRCode(amount) {
         const upiLink = `upi://pay?pa=${UPI_ID}&pn=${encodeURIComponent(MERCHANT_NAME)}&am=${amount}&cu=${CURRENCY}&tn=Premium%20Card%20Purchase`;
-        const qrApiUrl = `https://quickchart.io/qr?text=${encodeURIComponent(upiLink)}&size=250&margin=2&dark=000000&light=ffffff`;
-        return qrApiUrl;
+        return `https://quickchart.io/qr?text=${encodeURIComponent(upiLink)}&size=250&margin=2&dark=000000&light=ffffff`;
     }
 
-    // ========== SHOW QR MODAL ==========
+    // ========== SHOW QR MODAL (FALLBACK) ==========
     function showQRModal(amount) {
         const qrCodeUrl = generateQRCode(amount);
         
@@ -846,7 +847,7 @@
                 <div style="font-size: 24px; font-weight: 800; background: linear-gradient(135deg, #ffd700, #ff6b35); -webkit-background-clip: text; background-clip: text; color: transparent;">📱 SCAN & PAY</div>
                 <div class="qr-amount">₹${amount}</div>
                 <img class="qr-code-img" src="${qrCodeUrl}" alt="UPI QR Code">
-                <div class="upi-id-box" style="background: rgba(0,0,0,0.4); border-radius: 50px; padding: 10px; margin-top: 10px;">
+                <div class="upi-id-box">
                     <div style="font-size: 11px; color: #8a94b5;">UPI ID</div>
                     <div style="font-family: monospace; font-size: 16px; font-weight: 800; color: #ffd700;">${UPI_ID}</div>
                     <button class="copy-upi-btn" onclick="copyUPI()">📋 Copy UPI ID</button>
@@ -865,6 +866,57 @@
     function copyUPI() {
         navigator.clipboard.writeText(UPI_ID);
         showToast(`✅ UPI ID copied: ${UPI_ID}`);
+    }
+
+    // ========== TRY TO OPEN UPI APP DIRECTLY ==========
+    function tryOpenUpiApp(amount) {
+        // Method 1: Standard UPI intent (works for most apps)
+        const upiUrl = `upi://pay?pa=${UPI_ID}&pn=${encodeURIComponent(MERCHANT_NAME)}&am=${amount}&cu=${CURRENCY}&tn=Premium%20Card%20Purchase`;
+        
+        const anchor = document.createElement('a');
+        anchor.href = upiUrl;
+        anchor.style.display = 'none';
+        document.body.appendChild(anchor);
+        anchor.click();
+        document.body.removeChild(anchor);
+        
+        // Method 2: Try multiple app-specific intents as fallback
+        setTimeout(() => {
+            tryOpenAppSpecificIntents(amount);
+        }, 500);
+    }
+    
+    function tryOpenAppSpecificIntents(amount) {
+        const appIntents = [
+            `phonepe://pay?pa=${UPI_ID}&am=${amount}&pn=${MERCHANT_NAME}`,
+            `gpay://pay?pa=${UPI_ID}&am=${amount}&pn=${MERCHANT_NAME}`,
+            `paytmmp://pay?pa=${UPI_ID}&am=${amount}`,
+            `fampay://pay?pa=${UPI_ID}&am=${amount}&pn=${MERCHANT_NAME}`,
+            `amazonpay://pay?pa=${UPI_ID}&am=${amount}`,
+            `bhim://pay?pa=${UPI_ID}&am=${amount}&pn=${MERCHANT_NAME}`
+        ];
+        
+        // Try each intent with delay
+        let index = 0;
+        function tryNext() {
+            if (index >= appIntents.length) {
+                // If none worked, show QR code
+                showQRModal(amount);
+                return;
+            }
+            
+            const anchor = document.createElement('a');
+            anchor.href = appIntents[index];
+            anchor.style.display = 'none';
+            document.body.appendChild(anchor);
+            anchor.click();
+            document.body.removeChild(anchor);
+            index++;
+            
+            setTimeout(tryNext, 300);
+        }
+        
+        tryNext();
     }
 
     // ========== RENDER CARD HTML ==========
@@ -964,7 +1016,7 @@
         setTimeout(() => { if (swipeContainer) { swipeContainer.scrollLeft = 0; updateActiveDot(); } }, 100);
     }
 
-    // ========== BUY NOW - SHOW QR CODE ==========
+    // ========== BUY NOW - SMART PAYMENT ==========
     function buyNow(cardId, category) {
         const card = currentCards.find(c => c.id === cardId);
         
@@ -976,15 +1028,17 @@
             }
         }
         
-        // Show QR Code with selected amount
-        showQRModal(card.price);
+        showToast(`💳 Opening payment for ₹${card.price}...`, 1500);
         
-        // After payment simulation (for play store code)
+        // Try to open UPI app directly
+        tryOpenUpiApp(card.price);
+        
+        // After payment simulation
         setTimeout(() => {
             if (category === "playstore") {
                 const email = getEmail(cardId);
                 const playCard = playstoreCards.find(c => c.id === cardId);
-                // Don't show automatically - user will close QR after payment
+                // Code will be sent to email
             }
         }, 5000);
     }
